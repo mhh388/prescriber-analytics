@@ -1,0 +1,26 @@
+{
+  "name": "healthcare-etl-pipeline",
+  "properties": {
+    "description": "Healthcare ETL Pipeline - CMS Medicare Part D",
+    "activities": [
+      {
+        "name": "LogPipelineStart",
+        "type": "Wait",
+        "typeProperties": {
+          "waitTimeInSeconds": 1
+        }
+      }
+    ],
+    "parameters": {
+      "year": {
+        "type": "string",
+        "defaultValue": "2023"
+      },
+      "sample_rows": {
+        "type": "string",
+        "defaultValue": "0"
+      }
+    },
+    "annotations": ["healthcare", "cms-medicare", "databricks", "delta-lake"]
+  }
+}
