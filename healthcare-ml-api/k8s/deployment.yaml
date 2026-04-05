@@ -1,0 +1,121 @@
+# k8s/deployment.yaml
+# ─────────────────────────────────────────────────────────────
+# Kubernetes manifests for the Healthcare ML API
+# Includes: Deployment, Service, HorizontalPodAutoscaler
+#
+# Deploy:
+#   kubectl apply -f k8s/deployment.yaml
+#
+# Check:
+#   kubectl get pods
+#   kubectl get services
+# ─────────────────────────────────────────────────────────────
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: healthcare-ml-api
+  namespace: default
+  labels:
+    app: healthcare-ml-api
+    version: "1.0.0"
+    team: data-engineering
+    project: healthcare-pipeline
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: healthcare-ml-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0        # Zero-downtime deployment
+  template:
+    metadata:
+      labels:
+        app: healthcare-ml-api
+        version: "1.0.0"
+    spec:
+      containers:
+        - name: healthcare-ml-api
+          image: healthcare-ml-api:latest
+          imagePullPolicy: Never   # Use local image in minikube
+          ports:
+            - containerPort: 8000
+              name: http
+          # Resource limits — important for production stability
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          # Liveness probe — restart if app crashes
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3
+          # Readiness probe — only send traffic when ready
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 3
+          env:
+            - name: ENV
+              value: "production"
+            - name: LOG_LEVEL
+              value: "INFO"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: healthcare-ml-api-service
+  namespace: default
+  labels:
+    app: healthcare-ml-api
+spec:
+  type: NodePort        # NodePort for minikube access
+  selector:
+    app: healthcare-ml-api
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 8000
+      nodePort: 30080   # Access via minikube ip:30080
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: healthcare-ml-api-hpa
+  namespace: default
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: healthcare-ml-api
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
